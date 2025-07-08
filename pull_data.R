@@ -67,6 +67,14 @@ df_part %>%
   # filter(n>1) %>%
   View()
 
+df_pre_r %>% 
+  filter(`participantes-exists_id`=="no") %>% 
+  add_count(`participantes-participante_id`) %>% 
+  filter(n>1) %>% 
+  # select(`participantes-participante_id`, `participantes-correo`) %>%
+  # distinct(`participantes-participante_id`, .keep_all = T) %>%
+  View()
+
 df_ci %>% 
   select(
     `preamble-part_id`,
@@ -131,57 +139,90 @@ df_p3 %>%
 ## ----
   
 df_part %>% 
-  select(
-    phone:complete_p3
+  mutate(
+    createdAt = lubridate::ymd_hms(`__system`$createdAt, tz = "UTC"),
+    createdAt = lubridate::with_tz(createdAt, tzone = "America/Lima")
   ) %>% 
-  distinct(phone, .keep_all = T) %>% 
+  # View()
+  select(
+    createdAt,
+    phone:complete_p3
+  ) %>%
+  # View()
+  # distinct(phone, .keep_all = T) %>%
+  # add_count(phone) %>% 
+  # filter(n>1) %>% 
+  # View()
   left_join(
     df_pre_r %>% 
+      mutate(
+        SubmissionDate = lubridate::ymd_hms(SubmissionDate, tz = "UTC"),
+        SubmissionDate = lubridate::with_tz(SubmissionDate, tzone = "America/Lima")
+      ) %>% 
       # count(`participantes-participante_id_counts`, `participantes-exists_id`)
       filter(`participantes-exists_id`=="no") %>% 
-      select(`participantes-participante_id`, `participantes-correo`) %>%
+      arrange(desc(SubmissionDate)) %>% 
+      select(Preregistro=SubmissionDate, `participantes-participante_id`) %>%
       distinct(`participantes-participante_id`, .keep_all = T),
     by = c("long_id"="participantes-participante_id")
-  ) %>% 
+  ) %>%
+  # View()
   # filter(
   #   consent == "" # 25 participantes que enviaron preregistro sin registro de consentieminto en lista de entidades
   # ) %>% 
   # View()
   left_join(
     df_ci %>% 
-      select(
-        `preamble-part_id`,
-        `preamble-entity_name`,
-        `consent-Q0_accept_consent`
+      mutate(
+        SubmissionDate = lubridate::ymd_hms(SubmissionDate, tz = "UTC"),
+        SubmissionDate = lubridate::with_tz(SubmissionDate, tzone = "America/Lima")
       ) %>% 
       arrange(`preamble-part_id`, `preamble-entity_name`) %>%
-      distinct(`preamble-part_id`, .keep_all = T),
+      distinct(`preamble-part_id`, .keep_all = T) %>% 
+      select(
+        `preamble-part_id`,
+        # `preamble-entity_name`,
+        `consent-Q0_accept_consent`,
+        Consentimiento=SubmissionDate
+      ),
     by = c("long_id" = "preamble-part_id")
   ) %>% 
   # View()
-  select(
-    phone,
-    long_id,
-    consent:complete_p3,
-    `consent-Q0_accept_consent`
-  ) %>% 
+  # select(
+  #   phone,
+  #   long_id,
+  #   consent:complete_p3,
+  #   `consent-Q0_accept_consent`
+  # ) %>% 
   full_join(
     df_p1 %>% 
       arrange(desc(SubmissionDate)) %>% 
       distinct(`preamble-entity_name`, .keep_all = T) %>% 
+      mutate(
+        SubmissionDate = lubridate::ymd_hms(SubmissionDate, tz = "UTC"),
+        SubmissionDate = lubridate::with_tz(SubmissionDate, tzone = "America/Lima")
+      ) %>% 
       select(
         `preamble-part_id_2`,
-        `preamble-entity_name`,
-        `preamble-complete_p1`,
+        # `preamble-entity_name`,
+        `EN P1`=SubmissionDate
+        # `preamble-complete_p1`,
+        
       ),
     by = c("long_id"="preamble-part_id_2")
   ) %>% 
+  # View()
   full_join(
     df_p2 %>% 
+      mutate(
+        SubmissionDate = lubridate::ymd_hms(SubmissionDate, tz = "UTC"),
+        SubmissionDate = lubridate::with_tz(SubmissionDate, tzone = "America/Lima")
+      ) %>% 
       select(
         `preamble-part_id_3`,
-        `preamble-entity_name`,
-        `preamble-complete_p2`,
+        # `preamble-entity_name`,
+        # `preamble-complete_p2`,
+        `EN P2`=SubmissionDate
       ),
     by = c("long_id"="preamble-part_id_3")
   ) %>% 
@@ -189,28 +230,31 @@ df_part %>%
     df_p3 %>% 
       arrange(desc(SubmissionDate)) %>% 
       distinct(`preamble-entity_name`, .keep_all = T) %>% 
+      mutate(
+        SubmissionDate = lubridate::ymd_hms(SubmissionDate, tz = "UTC"),
+        SubmissionDate = lubridate::with_tz(SubmissionDate, tzone = "America/Lima")
+      ) %>% 
       select(
         `preamble-part_id_4`,
-        `preamble-entity_name`,
-        `preamble-complete_p3`,
+        # `preamble-entity_name`,
+        # `preamble-complete_p3`,
+        `EN P3`=SubmissionDate
       ),
     by = c("long_id"="preamble-part_id_4")
   ) %>% 
-  select(
-    phone,
-    long_id,
-    consent:complete_p3,
-    `consent-Q0_accept_consent`,
-    `preamble-complete_p1`,
-    `preamble-complete_p2`,
-    `preamble-complete_p3`
-  ) %>% 
+  arrange(Preregistro) %>% 
   # View()
   mutate(
-    across(everything(), ~case_when(.==""~NA_character_, T~.))
+    across(c(consent:complete_p3), ~case_when(.==""~NA_character_, T~.))
+  ) %>% 
+  mutate(
+    across(everything(), ~as.character(.))
   ) %>% 
   View()
+  # left_join(
+  #   googlesheets4::read_sheet(ss = "https://docs.google.com/spreadsheets/d/1keq67qOvyZU_Ow9qwuGjLpktX9DOqBJ1cjH-61qz7GA/edit?gid=548388021#gid=548388021", sheet = "2025-06-24") %>%
+  #     select(long_id, `Observaciones TCs`, Observaciones, Acciones),
+  #   by = "long_id"
+  # ) %>%
+  # # View()
   # googlesheets4::write_sheet(ss = "https://docs.google.com/spreadsheets/d/1keq67qOvyZU_Ow9qwuGjLpktX9DOqBJ1cjH-61qz7GA/edit?gid=0#gid=0", sheet = paste(lubridate::today()))
-  
-
-
