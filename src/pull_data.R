@@ -56,6 +56,16 @@ res_p3 <- GET(
 # Leer el CSV en un dataframe
 df_p3 <- read_csv(content(res_p3, as = "raw"))
 
+# Obtener los submissions de seguimiento fase 2 (formularios llenados) ----
+res_seg <- GET(
+  url = paste0(Sys.getenv("ODK_BASE_URL"), "v1/projects/", Sys.getenv("ODK_PROJECT_ID"), "/forms/", "Laura2-fase2-encuesta-seguimiento-Lima-TC", "/submissions.csv"),
+  authenticate(Sys.getenv("ODK_USERNAME"), Sys.getenv("ODK_PASSWORD"), type = "basic"),
+  accept("text/csv")
+)
+# Leer el CSV en un dataframe
+df_seg <- read_csv(content(res_seg, as = "raw"))
+# Exportar en xlsx
+writexl::write_xlsx(x = df_seg, path = paste("output/df_seguimiento_", lubridate::today(), ".xlsx", sep = ""))
 
 
 ## Integrar todo ----
