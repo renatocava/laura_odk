@@ -56,6 +56,15 @@ res_p3 <- GET(
 # Leer el CSV en un dataframe
 df_p3 <- read_csv(content(res_p3, as = "raw"))
 
+# Obtener los submissions de encuesta nacional (formularios llenos) ----
+res_en <- GET(
+  url = paste0(Sys.getenv("ODK_BASE_URL"), "v1/projects/", Sys.getenv("ODK_PROJECT_ID"), "/forms/", "Laura2-piloto-encuesta", "/submissions.csv"),
+  authenticate(Sys.getenv("ODK_USERNAME"), Sys.getenv("ODK_PASSWORD"), type = "basic"),
+  accept("text/csv")
+)
+# Leer el CSV en un dataframe
+df_en <- read_csv(content(res_en, as = "raw"))
+
 # Obtener los submissions de seguimiento fase 2 (formularios llenados) ----
 res_seg <- GET(
   url = paste0(Sys.getenv("ODK_BASE_URL"), "v1/projects/", Sys.getenv("ODK_PROJECT_ID"), "/forms/", "Laura2-fase2-encuesta-seguimiento-Lima-TC", "/submissions.csv"),
@@ -65,7 +74,67 @@ res_seg <- GET(
 # Leer el CSV en un dataframe
 df_seg <- read_csv(content(res_seg, as = "raw"))
 # Exportar en xlsx
-writexl::write_xlsx(x = df_seg, path = paste("output/df_seguimiento_", lubridate::today(), ".xlsx", sep = ""))
+writexl::write_xlsx(x = df_seg %>% select(SubmissionDate, `preamble-entity_short_id`, `preamble-visit_nr`, `preamble-visit_date`), path = paste("output/df_seguimiento_", lubridate::today(), ".xlsx", sep = ""))
+
+# Unir encuesta nacional ----
+df_p1 %>% 
+  arrange(desc(SubmissionDate)) %>% 
+  distinct(`preamble-entity_name`, .keep_all = T) %>% 
+  mutate(
+    SubmissionDate = lubridate::ymd_hms(SubmissionDate, tz = "UTC"),
+    SubmissionDate = lubridate::with_tz(SubmissionDate, tzone = "America/Lima")
+  ) %>% 
+  select(
+    `preamble-part_id_2`,
+    # `preamble-entity_name`,
+    `EN P1`=SubmissionDate
+    # `preamble-complete_p1`,
+    
+  ) %>% 
+  # View()
+  full_join(
+    df_p2 %>% 
+      mutate(
+        SubmissionDate = lubridate::ymd_hms(SubmissionDate, tz = "UTC"),
+        SubmissionDate = lubridate::with_tz(SubmissionDate, tzone = "America/Lima")
+      ) %>% 
+      arrange(desc(SubmissionDate)) %>% 
+      distinct(`preamble-entity_name`, .keep_all = T) %>% 
+      select(
+        `preamble-part_id_3`,
+        # `preamble-entity_name`,
+        # `preamble-complete_p2`,
+        `EN P2`=SubmissionDate
+      ),
+    by = c("preamble-part_id_2"="preamble-part_id_3")
+  ) %>% 
+  # count(`preamble-part_id_2`) %>% 
+  # View()
+  full_join(
+    df_p3 %>% 
+      arrange(desc(SubmissionDate)) %>% 
+      distinct(`preamble-entity_name`, .keep_all = T) %>% 
+      mutate(
+        SubmissionDate = lubridate::ymd_hms(SubmissionDate, tz = "UTC"),
+        SubmissionDate = lubridate::with_tz(SubmissionDate, tzone = "America/Lima")
+      ) %>% 
+      select(
+        `preamble-part_id_4`,
+        # `preamble-entity_name`,
+        # `preamble-complete_p3`,
+        `EN P3`=SubmissionDate
+      ),
+    by = c("preamble-part_id_2"="preamble-part_id_4")
+  ) %>% 
+  full_join(
+    df_en %>% 
+      select(`preamble-entity_details-long_id`, EN = SubmissionDate),
+    by = c("preamble-part_id_2"="preamble-entity_details-long_id")
+  ) %>% 
+  arrange(`EN P1`, `EN P2`, EN) %>% 
+  View()
+  # writexl::write_xlsx(path = paste("output/df_en_", lubridate::today(), ".xlsx", sep = ""))
+
 
 
 ## Integrar todo ----
